@@ -24,7 +24,7 @@
             idna
             sniffio
           ]);
-        in pkgs.writeScriptBin "spoiler-images-bot" ''
+        in pkgs.writeScriptBin "spoiler-images" ''
           #!${pythonEnv}/bin/python3
           ${builtins.readFile ./spoilerImagesBot.py}
         '';
@@ -64,7 +64,7 @@
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.default}/bin/spoiler-images-bot";
+          program = "${self.packages.${system}.default}/bin/spoiler-images";
         };
       });
 } 
