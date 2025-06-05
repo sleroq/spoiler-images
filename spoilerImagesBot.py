@@ -34,7 +34,7 @@ async def echo_media_group(context: CallbackContext, media_group_id):
     elif message.video:
       response.append(InputMediaVideo(media=message.video.file_id, has_spoiler=True))
     elif message.animation:   # Check if the media is an animation/GIF file.
-      response.append(InputMediaAnimation(media=message.animation.file_id))
+      response.append(InputMediaAnimation(media=message.animation.file_id, has_spoiler=True))
   await context.bot.send_media_group(chat_id=chat_id, media=response)
   del media_groups[media_group_id]
 
@@ -57,10 +57,27 @@ async def media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif message.animation:
           await context.bot.send_animation(chat_id=chat_id, animation=message.animation.file_id, has_spoiler=True)
 
+async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  if update.message is not None and update.effective_chat.type == 'private':
+    message = update.message
+    if message.text:
+      # Wrap the text in spoiler formatting using MarkdownV2 syntax
+      spoiler_text = f"||{message.text}||"
+      await context.bot.send_message(
+        chat_id=chat_id, 
+        text=spoiler_text, 
+        parse_mode='MarkdownV2'
+      )
+
 if __name__ == '__main__':
   application = ApplicationBuilder().token(BOT_TOKEN).build()
   
+  # Handler for media (photos, videos, animations)
   media_handler = MessageHandler(filters.ANIMATION | filters.PHOTO | filters.VIDEO, media)
   application.add_handler(media_handler)
+  
+  # Handler for text messages
+  text_handler = MessageHandler(filters.TEXT & ~filters.COMMAND, text_message)
+  application.add_handler(text_handler)
   
   application.run_polling()
