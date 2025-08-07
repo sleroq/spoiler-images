@@ -2,12 +2,12 @@ import logging
 import asyncio
 import os
 from telegram import Update
-from telegram.ext import filters, MessageHandler, ApplicationBuilder, ContextTypes, CallbackContext
+from telegram.ext import filters, MessageHandler, ApplicationBuilder, ContextTypes, CallbackContext, CommandHandler
 from telegram import Update, InputMediaAnimation, InputMediaVideo, InputMediaPhoto
 
 logging.basicConfig(
   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-  level=logging.INFO
+  level=logging.WARNING
 )
 
 # Load configuration from environment variables
@@ -26,6 +26,46 @@ except ValueError:
 
 media_groups = {}
 
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /start command"""
+    if update.effective_chat.type == 'private':
+        welcome_message = (
+            "🤖 *Добро пожаловать в анонимный бот пересылки сообщений!*\n\n"
+            "📝 *Как это работает:*\n"
+            "• Отправьте мне любое сообщение (текст, фото, видео, анимации)\n"
+            "• Я перешлю его в групповой чат как спойлер\n"
+            "• Все сообщения анонимны - никто не узнает, кто их отправил\n\n"
+            "⚠️ *Важно знать:*\n"
+            "• Ответы из группового чата невозможны через бота\n"
+            "• Ваша личность полностью анонимна\n"
+            "• Бот работает только в личных сообщениях\n\n"
+            "💡 Используйте /help для получения дополнительной информации"
+        )
+        await update.message.reply_text(welcome_message, parse_mode='MarkdownV2')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle the /help command"""
+    if update.effective_chat.type == 'private':
+        help_message = (
+            "ℹ️ *Справка по боту*\n\n"
+            "*Поддерживаемые типы сообщений:*\n"
+            "• 📝 Текстовые сообщения\n"
+            "• 📷 Фотографии\n"
+            "• 🎥 Видео\n"
+            "• 🎭 Анимации/GIF\n"
+            "• 📎 Группы медиафайлов\n\n"
+            "*Особенности:*\n"
+            "• Все сообщения отправляются как спойлеры\n"
+            "• Полная анонимность отправителя\n"
+            "• Нет возможности получить ответ\n"
+            "• Работает только в личных сообщениях\n\n"
+            "*Команды:*\n"
+            "/start \\- показать приветствие\n"
+            "/help \\- показать эту справку\n\n"
+            "Просто отправьте сообщение, чтобы переслать его анонимно\\!"
+        )
+        await update.message.reply_text(help_message, parse_mode='MarkdownV2')
+
 async def echo_media_group(context: CallbackContext, media_group_id):
   response = []
   for message in media_groups[media_group_id]:
@@ -36,6 +76,15 @@ async def echo_media_group(context: CallbackContext, media_group_id):
     elif message.animation:   # Check if the media is an animation/GIF file.
       response.append(InputMediaAnimation(media=message.animation.file_id, has_spoiler=True))
   await context.bot.send_media_group(chat_id=chat_id, media=response)
+  
+  # Reply to the user to confirm delivery
+  original_message = media_groups[media_group_id][0]  # Get the first message from the group
+  await context.bot.send_message(
+    chat_id=original_message.chat_id,
+    text="переслал",
+    reply_to_message_id=original_message.message_id
+  )
+  
   del media_groups[media_group_id]
 
 async def media(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,10 +101,13 @@ async def media(update: Update, context: ContextTypes.DEFAULT_TYPE):
       else:
         if message.photo:
           await context.bot.send_photo(chat_id=chat_id, photo=message.photo[-1], has_spoiler=True)
+          await message.reply_text("переслал")
         elif message.video:
           await context.bot.send_video(chat_id=chat_id, video=message.video, has_spoiler=True)
+          await message.reply_text("переслал")
         elif message.animation:
           await context.bot.send_animation(chat_id=chat_id, animation=message.animation.file_id, has_spoiler=True)
+          await message.reply_text("переслал")
 
 async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
   if update.message is not None and update.effective_chat.type == 'private':
@@ -68,9 +120,14 @@ async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=spoiler_text, 
         parse_mode='MarkdownV2'
       )
+      await message.reply_text("переслал")
 
 if __name__ == '__main__':
   application = ApplicationBuilder().token(BOT_TOKEN).build()
+  
+  # Command handlers
+  application.add_handler(CommandHandler("start", start_command))
+  application.add_handler(CommandHandler("help", help_command))
   
   # Handler for media (photos, videos, animations)
   media_handler = MessageHandler(filters.ANIMATION | filters.PHOTO | filters.VIDEO, media)
