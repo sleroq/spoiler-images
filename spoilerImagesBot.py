@@ -10,6 +10,10 @@ logging.basicConfig(
   level=logging.INFO
 )
 
+# Suppress verbose httpx logs
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('telegram.ext').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # Load configuration from environment variables
